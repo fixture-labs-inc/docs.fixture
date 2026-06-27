@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "MCP Docs",
+  "name": "FixtureLabs MCP",
   "colors": {
     "primary": "#16A34A",
     "light": "#4ADE80",
@@ -18,25 +18,36 @@
         ]
       },
       {
-        "group": "Concepts",
+        "group": "Connect a Client",
         "pages": [
-          "concepts/architecture",
-          "concepts/clients",
-          "concepts/servers",
-          "concepts/transports"
+          "connect/claude",
+          "connect/cursor",
+          "connect/programmatic"
         ]
       },
       {
-        "group": "Build",
+        "group": "Authentication",
         "pages": [
-          "build/tools",
-          "build/resources",
-          "build/prompts"
+          "authentication/overview",
+          "authentication/scopes",
+          "authentication/endpoints"
+        ]
+      },
+      {
+        "group": "Tools",
+        "pages": [
+          "tools/overview",
+          "tools/utility",
+          "tools/blog-posts",
+          "tools/practice-questions"
         ]
       },
       {
         "group": "Reference",
         "pages": [
+          "reference/architecture",
+          "reference/rate-limits",
+          "reference/errors",
           "reference/configuration",
           "reference/troubleshooting"
         ]
@@ -45,6 +56,8 @@
   },
   "footer": {
     "socials": {
+      "x": "https://x.com/fixturelabs",
+      "linkedin": "https://www.linkedin.com/company/fixturelabs",
       "github": "https://github.com/modelcontextprotocol"
     }
   }

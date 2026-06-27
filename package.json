@@ -2,10 +2,12 @@
   "name": "docs.fixture",
   "version": "0.1.0",
   "private": true,
-  "description": "MCP documentation site built with Mintlify",
+  "description": "FixtureLabs MCP documentation site built with Mintlify",
   "scripts": {
     "dev": "mint dev",
-    "build": "mint build",
+    "login": "mint login",
+    "status": "mint status",
+    "validate": "mint validate",
     "check": "mint broken-links",
     "upgrade": "mint update"
   },
