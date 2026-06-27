@@ -1,0 +1,82 @@
+---
+title: "Cursor & IDEs"
+description: "Connect the FixtureLabs MCP server to Cursor and other editors."
+icon: "code"
+---
+
+Editors that support **remote MCP servers** can connect to FixtureLabs directly
+over Streamable HTTP. Editors that only support local (stdio) servers connect
+through the [`mcp-remote`](#stdio-only-clients) bridge.
+
+```
+https://app.fixturelabs.io/api/mcps/mcp
+```
+
+## Cursor
+
+Cursor reads MCP servers from `mcp.json`:
+
+- **Global** — `~/.cursor/mcp.json`
+- **Per-project** — `.cursor/mcp.json` in the repo root
+
+```json .cursor/mcp.json
+{
+  "mcpServers": {
+    "fixturelabs": {
+      "url": "https://app.fixturelabs.io/api/mcps/mcp"
+    }
+  }
+}
+```
+
+Reload Cursor, open **Settings → MCP**, and you'll see `fixturelabs`. Click to
+authorize — Cursor discovers the OAuth endpoints and opens the FixtureLabs consent
+screen. After approval the tools are available to the agent.
+
+## VS Code
+
+VS Code's MCP support (and forks like Windsurf) takes a remote server the same way.
+Add it to your MCP settings:
+
+```json
+{
+  "servers": {
+    "fixturelabs": {
+      "type": "http",
+      "url": "https://app.fixturelabs.io/api/mcps/mcp"
+    }
+  }
+}
+```
+
+The first request triggers the browser-based OAuth sign-in.
+
+## stdio-only clients
+
+If your editor can only launch a local command, wrap the remote server with
+`mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "fixturelabs": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://app.fixturelabs.io/api/mcps/mcp"]
+    }
+  }
+}
+```
+
+`mcp-remote` handles OAuth, caches the token under `~/.mcp-auth`, and bridges
+stdio ↔ HTTP.
+
+## Verify
+
+Ask the agent to call the **ping** tool — once you've authorized, you should get
+`pong` back. Then call **whoami** to confirm the authenticated identity.
+
+<Tip>
+Per-project `.cursor/mcp.json` is handy when you only want FixtureLabs tools
+available inside a specific repo. Use the global file to make them available
+everywhere.
+</Tip>

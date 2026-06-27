@@ -1,0 +1,121 @@
+---
+title: "Programmatic access"
+description: "Talk to the FixtureLabs MCP server from your own code."
+icon: "terminal"
+---
+
+You can drive the server from your own agent or script using the official MCP
+SDKs, or speak raw JSON-RPC over HTTP. Either way, **every call to the MCP
+endpoint requires a valid OAuth access token** — there is no API-key shortcut.
+
+```
+MCP endpoint   https://app.fixturelabs.io/api/mcps/mcp
+Transport      Streamable HTTP (no SSE-only fallback)
+Auth           OAuth 2.1 — Authorization Code + PKCE
+```
+
+## Discovery (no token required)
+
+The discovery and OAuth endpoints are open. Start here to learn where to register
+and how to get a token:
+
+```bash
+# What is this resource, and which server authorizes it?
+curl https://app.fixturelabs.io/.well-known/oauth-protected-resource
+
+# Endpoints, scopes, and supported grants
+curl https://app.fixturelabs.io/.well-known/oauth-authorization-server
+```
+
+See [Authentication → Endpoints](/authentication/endpoints) for the full request
+and response shapes of `register`, `authorize`, and `token`.
+
+## Getting a token
+
+The server implements **Dynamic Client Registration**, so a compliant MCP client
+obtains a token with no manual setup: it registers, opens the browser for consent,
+and exchanges the code for a token. The full sequence is documented in
+[Authentication → Overview](/authentication/overview).
+
+If you don't want to implement the OAuth flow yourself, run the
+[`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge — it performs the
+handshake and caches the resulting token under `~/.mcp-auth`:
+
+```bash
+npx -y mcp-remote https://app.fixturelabs.io/api/mcps/mcp
+```
+
+## TypeScript SDK
+
+Use `@modelcontextprotocol/sdk` with the Streamable HTTP transport. Supply an
+`OAuthClientProvider` so the SDK can register, authorize, and refresh for you:
+
+```ts
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const transport = new StreamableHTTPClientTransport(
+  new URL("https://app.fixturelabs.io/api/mcps/mcp"),
+  {
+    // Your OAuthClientProvider implementation drives the browser-based
+    // consent and stores tokens. See the SDK's auth examples.
+    authProvider: myOAuthProvider,
+  }
+);
+
+const client = new Client({ name: "my-agent", version: "1.0.0" });
+await client.connect(transport);
+
+// Discover what's available
+const { tools } = await client.listTools();
+
+// Call a tool
+const result = await client.callTool({
+  name: "ping",
+  arguments: { message: "hello" },
+});
+console.log(result.content); // [{ type: "text", text: "pong: hello" }]
+```
+
+<Tip>
+If you already hold a token (for example one minted by `mcp-remote`), you can skip
+the auth provider and attach it as a header instead:
+
+```ts
+const transport = new StreamableHTTPClientTransport(
+  new URL("https://app.fixturelabs.io/api/mcps/mcp"),
+  { requestInit: { headers: { Authorization: `Bearer ${accessToken}` } } }
+);
+```
+</Tip>
+
+## Raw JSON-RPC over HTTP
+
+If you'd rather not use an SDK, POST JSON-RPC 2.0 messages to the endpoint. The
+Streamable HTTP transport requires both content types in `Accept`, and a bearer
+token on every request:
+
+```bash
+curl -sS https://app.fixturelabs.io/api/mcps/mcp \
+  -H "Authorization: Bearer fxt_mcp_xxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": { "name": "ping", "arguments": { "message": "hello" } }
+  }'
+```
+
+Responses may be returned as an SSE-framed stream, so parse the `data:` lines for
+the JSON-RPC payload. A missing or invalid token returns **HTTP 401** with a
+`WWW-Authenticate` header pointing at the protected-resource metadata — that header
+is the signal an MCP client uses to start the OAuth flow.
+
+<Warning>
+Tokens are bearer credentials. Treat an access token like a password: never commit
+it, and prefer short-lived tokens obtained through the OAuth flow over long-lived
+secrets. Access tokens expire after **1 hour**; use the refresh token to get a new
+one.
+</Warning>
