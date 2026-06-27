@@ -1,0 +1,20 @@
+---
+title: "Clients"
+description: "How MCP clients connect hosts to servers."
+icon: "plug"
+---
+
+An MCP **client** lives inside a host application and maintains a single session with one server. Hosts typically spin up multiple clients—one per connected server.
+
+## Responsibilities
+
+- Spawn or connect to the server process.
+- Negotiate protocol version and capabilities.
+- Forward host requests to the server and surface responses.
+- Enforce user consent before tool calls run.
+
+## Common hosts
+
+- Claude Desktop
+- Editor extensions (VS Code, JetBrains)
+- Custom agents built on the MCP SDKs

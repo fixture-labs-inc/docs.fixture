@@ -1,0 +1,32 @@
+---
+title: "Troubleshooting"
+description: "Common MCP issues and fixes."
+icon: "circle-question"
+---
+
+## Server doesn't appear in the host
+
+- Verify the config file path and JSON syntax.
+- Use an absolute path for `command` and script arguments.
+- Restart the host application after editing config.
+
+## Tool calls fail silently
+
+- Check that the server advertises `tools` in `capabilities`.
+- Confirm tool input matches the declared JSON schema.
+- Inspect server logs (stderr is forwarded to the host log).
+
+## Connection drops mid-session
+
+- For stdio: ensure your server never writes non-JSON to stdout.
+- For HTTP: confirm the server keeps SSE connections open and handles reconnect.
+
+## Resource updates aren't received
+
+- The server must declare `resources.subscribe: true`.
+- Send `notifications/resources/updated` whenever underlying data changes.
+
+## Where to get help
+
+- [MCP specification](https://modelcontextprotocol.io)
+- [Reference servers](https://github.com/modelcontextprotocol/servers)

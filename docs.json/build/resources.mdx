@@ -1,0 +1,39 @@
+---
+title: "Resources"
+description: "Provide read-only context the model can reference."
+icon: "database"
+---
+
+**Resources** are addressable, read-only data the model can pull in as context. Each resource has a URI, MIME type, and contents.
+
+## Listing resources
+
+```ts
+server.setRequestHandler("resources/list", async () => ({
+  resources: [
+    {
+      uri: "file:///project/README.md",
+      name: "README",
+      mimeType: "text/markdown"
+    }
+  ]
+}));
+```
+
+## Reading a resource
+
+```ts
+server.setRequestHandler("resources/read", async (req) => ({
+  contents: [
+    {
+      uri: req.params.uri,
+      mimeType: "text/markdown",
+      text: await fs.readFile(toPath(req.params.uri), "utf8")
+    }
+  ]
+}));
+```
+
+## Subscriptions
+
+If your server advertises `resources.subscribe`, clients can subscribe to updates and receive `notifications/resources/updated` events.

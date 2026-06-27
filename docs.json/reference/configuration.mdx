@@ -1,0 +1,54 @@
+---
+title: "Configuration"
+description: "Configure MCP servers in popular hosts."
+icon: "gear"
+---
+
+## Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/Documents"]
+    }
+  }
+}
+```
+
+## Environment variables
+
+Pass secrets through `env`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "ghp_..." }
+    }
+  }
+}
+```
+
+## Remote servers
+
+For HTTP transports, provide a URL and optional headers:
+
+```json
+{
+  "mcpServers": {
+    "acme": {
+      "url": "https://mcp.acme.com",
+      "headers": { "Authorization": "Bearer ${ACME_TOKEN}" }
+    }
+  }
+}
+```

@@ -1,0 +1,39 @@
+---
+title: "Prompts"
+description: "Share reusable prompt templates with users."
+icon: "message"
+---
+
+**Prompts** are parameterized templates the host surfaces to the user (often as slash commands).
+
+## Defining a prompt
+
+```ts
+server.setRequestHandler("prompts/list", async () => ({
+  prompts: [
+    {
+      name: "summarize",
+      description: "Summarize a document",
+      arguments: [
+        { name: "style", description: "bullet | paragraph", required: false }
+      ]
+    }
+  ]
+}));
+```
+
+## Returning the prompt
+
+```ts
+server.setRequestHandler("prompts/get", async (req) => ({
+  messages: [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Summarize the attached document in ${req.params.arguments?.style ?? "bullet"} form.`
+      }
+    }
+  ]
+}));
+```

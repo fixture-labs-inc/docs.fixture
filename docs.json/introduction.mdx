@@ -1,0 +1,36 @@
+---
+title: "Introduction"
+description: "What is the Model Context Protocol (MCP) and why it matters."
+icon: "circle-info"
+---
+
+The **Model Context Protocol (MCP)** is an open standard for connecting AI assistants to the systems where data lives: content repositories, business tools, and development environments. MCP provides a uniform way for models to discover and use external **tools**, **resources**, and **prompts**.
+
+## Why MCP?
+
+Before MCP, every integration between an AI app and an external system was bespoke. MCP standardizes the wire format and lifecycle so that:
+
+- **Any compatible client** (Claude Desktop, IDEs, custom apps) can talk to **any compatible server**.
+- **Servers** expose capabilities once and work across the ecosystem.
+- **Users** keep control over what data and actions the model can access.
+
+## Core primitives
+
+<CardGroup cols={3}>
+  <Card title="Tools" icon="wrench" href="/build/tools">
+    Functions the model can invoke to take action.
+  </Card>
+
+  <Card title="Resources" icon="database" href="/build/resources">
+    Read-only data the model can reference as context.
+  </Card>
+
+  <Card title="Prompts" icon="message" href="/build/prompts">
+    Reusable, parameterized prompt templates.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+- [Quickstart](/quickstart) — build your first MCP server in minutes.
+- [Architecture](/concepts/architecture) — understand how clients and servers communicate.
