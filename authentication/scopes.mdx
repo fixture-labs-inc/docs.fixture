@@ -1,0 +1,82 @@
+---
+title: "Scopes & permissions"
+description: "What each scope grants and how the consent screen works."
+icon: "shield-halved"
+---
+
+Scopes describe *what a token is allowed to do*. The FixtureLabs MCP server keeps
+the scope set deliberately small, and the **base `mcp` scope is always granted** so
+every connected token can use the read and utility tools.
+
+## Available scopes
+
+| Scope | Granted by default | What it allows |
+| --- | --- | --- |
+| `mcp` | **Always** | Base access — connect and call read/utility tools. Automatically added to every grant. |
+| `blog:write` | On request | Create blog post drafts via `create_blog_post`. |
+
+<Note>
+The server advertises its scopes at
+`/.well-known/oauth-authorization-server` (`scopes_supported`). Today that's
+`mcp` and `blog:write` — only `blog:write` changes what you can do.
+</Note>
+
+## How scopes are decided
+
+1. The client includes a space-separated `scope` value when it starts the
+   authorization request (for example `scope=mcp blog:write`).
+2. The server keeps only the scopes it recognizes and **always adds `mcp`**.
+   Unknown scopes are dropped silently.
+3. The resulting set is attached to the issued token and recorded with the grant.
+
+That means a client that requests nothing still gets `mcp` — enough for every
+read tool. To use a write tool, the client must explicitly request its scope.
+
+<Warning>
+To create blog posts, the client must request **`blog:write`** during
+authorization. If a token only carries `mcp`, `create_blog_post` returns a
+"missing a required scope" error. Check the scopes on your token with the
+[`whoami`](/tools/utility) tool.
+</Warning>
+
+## Per-tool requirements
+
+| Tool | Needs your identity | Required scope |
+| --- | --- | --- |
+| `ping` | No | — |
+| `list_blog_posts` | No | — |
+| `get_blog_post` | No | — |
+| `whoami` | Yes | — |
+| `get_user_profile` | Yes | — |
+| `get_question` | Yes | — |
+| `create_blog_post` | Yes | `blog:write` |
+
+"Needs your identity = No" tools still require a valid token to call — they simply
+don't act as you or read your account. See
+[Authentication → Overview](/authentication/overview#what-authenticated-gates).
+
+## The consent screen
+
+When a client sends you to authorize, you land on the FixtureLabs consent card. It
+shows:
+
+- The **requesting application** and its website.
+- The **account** you're authorizing as (your signed-in email).
+- The **redirect URI** the authorization code will be sent to.
+- **Authorize** and **Deny** actions.
+
+Approving issues the token with the resolved scopes. Denying redirects back to the
+client with an `access_denied` error and no token is issued.
+
+<Info>
+Generic bridge clients (like `mcp-remote`) are displayed as **Fixture** on the
+consent card, so a proxy's raw name never obscures what you're approving.
+</Info>
+
+## Reducing what an integration can do
+
+- Connect with a client that requests only the scopes it needs. A read-only
+  integration never needs `blog:write`.
+- Use `whoami` to audit a token's granted scopes at any time.
+- Tokens are short-lived (1 hour) and bound to the client that requested them, so a
+  leaked access token is limited in both time and capability.
