@@ -1,80 +1,123 @@
 ---
 title: "Quickstart"
-description: "Build and run your first MCP server in under 10 minutes."
+description: "Connect a client to the FixtureLabs MCP server and call your first tool."
 icon: "bolt"
 ---
 
-This guide walks you through creating a minimal MCP server that exposes a single tool, then connecting it to a client.
+This guide gets you from zero to a working connection. The fastest path is
+**Claude Desktop** using the `mcp-remote` bridge, which handles the OAuth sign-in
+for you.
 
 ## Prerequisites
 
-- Node.js 18\+ or Python 3.10\+
-- An MCP-compatible client (e.g., Claude Desktop)
+- A **FixtureLabs account** (you sign in with Google).
+- An MCP-capable client. This guide uses [Claude Desktop](https://claude.ai/download).
+- [Node.js 18+](https://nodejs.org) — `mcp-remote` runs through `npx`.
 
-## 1. Install the SDK
+<Note>
+The server is **remote**. You don't clone or run anything from FixtureLabs — you
+only point your client at the endpoint below.
+</Note>
 
-<CodeGroup>
+## 1. Confirm the server is reachable
 
-```bash npm
-npm install @modelcontextprotocol/sdk
+Before signing in, hit the public discovery endpoint. No auth required:
+
+```bash
+curl https://app.fixturelabs.io/.well-known/oauth-protected-resource
 ```
 
-```bash pip
-pip install mcp
-```
+You'll get back JSON describing the resource and its authorization server. If you
+see that, the server is up and your client will be able to discover how to log in.
 
-</CodeGroup>
+## 2. Add the server to Claude Desktop
 
-## 2. Create a server
+Open your `claude_desktop_config.json`:
 
-```ts server.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+- **macOS** — `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows** — `%APPDATA%\Claude\claude_desktop_config.json`
 
-const server = new Server(
-  { name: "hello-mcp", version: "0.1.0" },
-  { capabilities: { tools: {} } }
-);
-
-server.setRequestHandler("tools/list", async () => ({
-  tools: [
-    {
-      name: "echo",
-      description: "Echoes the input string",
-      inputSchema: {
-        type: "object",
-        properties: { message: { type: "string" } },
-        required: ["message"],
-      },
-    },
-  ],
-}));
-
-server.setRequestHandler("tools/call", async (req) => ({
-  content: [{ type: "text", text: `You said: ${req.params.arguments.message}` }],
-}));
-
-await server.connect(new StdioServerTransport());
-```
-
-## 3. Register with a client
-
-Add your server to the client's configuration. For Claude Desktop:
+Add the FixtureLabs server:
 
 ```json claude_desktop_config.json
 {
   "mcpServers": {
-    "hello-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/server.js"]
+    "fixturelabs": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://app.fixturelabs.io/api/mcps/mcp"]
     }
   }
 }
 ```
 
-Restart the client and your `echo` tool will appear.
+Restart Claude Desktop.
 
-## Next
+## 3. Sign in
 
-- Learn the [architecture](/concepts/architecture).
-- Add [resources](/build/resources) and [prompts](/build/prompts).
+The first time the connection starts, `mcp-remote` opens your browser to the
+FixtureLabs consent screen.
+
+<Steps>
+  <Step title="Sign in with Google">
+    If you're not already logged in to FixtureLabs, you'll be sent to Google
+    sign-in and back.
+  </Step>
+  <Step title="Review the request">
+    You'll see which application is asking for access and what it can do, then
+    choose **Authorize** or **Deny**.
+  </Step>
+  <Step title="Done">
+    On approval you're redirected back, your client stores the token, and the
+    tools become available. You won't be asked again until the token expires and
+    can't be refreshed.
+  </Step>
+</Steps>
+
+<Tip>
+`mcp-remote` caches your tokens under `~/.mcp-auth`. If a connection gets stuck,
+delete that folder to force a fresh sign-in.
+</Tip>
+
+## 4. Call your first tool
+
+Ask Claude something that maps to a tool. For example:
+
+> "Use the fixturelabs **ping** tool with the message *hello*."
+
+You should get back `pong: hello`. Every tool — including `ping` — runs behind the
+authenticated endpoint, so this only works once you've signed in. `ping` is the
+quickest way to confirm the wiring because it needs no special permissions.
+
+Then try one that reads your account:
+
+> "Call **whoami** on fixturelabs and tell me which account I'm connected as."
+
+This returns the user id, email, role, and granted scopes for your token.
+
+## 5. Do something useful
+
+A few prompts to try once you're connected:
+
+- *"Get me a random unsolved **CAD** question from FixtureLabs to practice."*
+- *"List the 5 most recent FixtureLabs blog posts."*
+- *"Read the FixtureLabs blog post with slug `getting-started-with-cad`."*
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="Connect other clients" icon="plug" href="/connect/cursor">
+    Cursor, other IDEs, and programmatic access.
+  </Card>
+
+  <Card title="How auth works" icon="key" href="/authentication/overview">
+    The full OAuth 2.1 + PKCE flow, tokens, and refresh.
+  </Card>
+
+  <Card title="Browse the tools" icon="wrench" href="/tools/overview">
+    Inputs, outputs, and scopes for every tool.
+  </Card>
+
+  <Card title="Troubleshooting" icon="circle-question" href="/reference/troubleshooting">
+    Fixes for the most common connection problems.
+  </Card>
+</CardGroup>
