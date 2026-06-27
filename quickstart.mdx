@@ -1,0 +1,80 @@
+---
+title: "Quickstart"
+description: "Build and run your first MCP server in under 10 minutes."
+icon: "bolt"
+---
+
+This guide walks you through creating a minimal MCP server that exposes a single tool, then connecting it to a client.
+
+## Prerequisites
+
+- Node.js 18\+ or Python 3.10\+
+- An MCP-compatible client (e.g., Claude Desktop)
+
+## 1. Install the SDK
+
+<CodeGroup>
+
+```bash npm
+npm install @modelcontextprotocol/sdk
+```
+
+```bash pip
+pip install mcp
+```
+
+</CodeGroup>
+
+## 2. Create a server
+
+```ts server.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new Server(
+  { name: "hello-mcp", version: "0.1.0" },
+  { capabilities: { tools: {} } }
+);
+
+server.setRequestHandler("tools/list", async () => ({
+  tools: [
+    {
+      name: "echo",
+      description: "Echoes the input string",
+      inputSchema: {
+        type: "object",
+        properties: { message: { type: "string" } },
+        required: ["message"],
+      },
+    },
+  ],
+}));
+
+server.setRequestHandler("tools/call", async (req) => ({
+  content: [{ type: "text", text: `You said: ${req.params.arguments.message}` }],
+}));
+
+await server.connect(new StdioServerTransport());
+```
+
+## 3. Register with a client
+
+Add your server to the client's configuration. For Claude Desktop:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "hello-mcp": {
+      "command": "node",
+      "args": ["/absolute/path/to/server.js"]
+    }
+  }
+}
+```
+
+Restart the client and your `echo` tool will appear.
+
+## Next
+
+- Learn the [architecture](/concepts/architecture).
+- Add [resources](/build/resources) and [prompts](/build/prompts).

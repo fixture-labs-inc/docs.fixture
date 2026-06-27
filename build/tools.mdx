@@ -1,0 +1,48 @@
+---
+title: "Tools"
+description: "Expose callable actions to the model."
+icon: "wrench"
+---
+
+**Tools** are functions the model can invoke. Each tool has a name, description, and JSON-Schema input.
+
+## Defining a tool
+
+```ts
+server.setRequestHandler("tools/list", async () => ({
+  tools: [
+    {
+      name: "create_issue",
+      description: "Create a GitHub issue",
+      inputSchema: {
+        type: "object",
+        properties: {
+          repo: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string" }
+        },
+        required: ["repo", "title"]
+      }
+    }
+  ]
+}));
+```
+
+## Handling calls
+
+```ts
+server.setRequestHandler("tools/call", async (req) => {
+  const { name, arguments: args } = req.params;
+  if (name === "create_issue") {
+    const url = await github.createIssue(args);
+    return { content: [{ type: "text", text: `Created: ${url}` }] };
+  }
+  throw new Error(`Unknown tool: ${name}`);
+});
+```
+
+## Guidelines
+
+- Make tool names verb-based and unambiguous.
+- Describe side effects in the description so the model can reason about safety.
+- Return structured `isError: true` responses instead of throwing for expected failures.
