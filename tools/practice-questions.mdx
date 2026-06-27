@@ -1,0 +1,95 @@
+---
+title: "Practice question tools"
+description: "Fetch FixtureLabs practice questions to work through."
+icon: "ruler-combined"
+---
+
+## get_question
+
+Fetches one FixtureLabs practice question for the connected user. Use it to pull a
+fresh problem to work through, filter to a topic or difficulty, or re-open a
+specific question by id.
+
+| | |
+| --- | --- |
+| **Acts as you** | Yes |
+| **Scope** | — |
+
+<Warning>
+The **answer key is never returned**. `get_question` returns only the user-facing
+prompt and metadata — the same content you'd see on the website before solving.
+</Warning>
+
+### Input
+
+All fields are optional. How they combine:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `questionId` | `string` | Fetch a specific question. Overrides the filters below. |
+| `type` | `enum` | One of `fundamental`, `cad`, `dfm`, `calculations`. |
+| `difficulty` | `enum` | One of `easy`, `medium`, `hard`. |
+
+**Selection logic**
+
+- **No arguments** → a random *unsolved* question. The server tries the supported
+  types in random order so you don't always get the same topic.
+- **`type` only** → a random unsolved question of that type.
+- **`difficulty` only / with `type`** → narrows the random pick.
+- **`questionId`** → that exact question (still subject to access checks).
+
+### Output
+
+JSON combining question metadata with type-specific, user-facing content:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `questionId` | `string` | The question id |
+| `type` | `string` | `fundamental` · `cad` · `dfm` · `calculations` |
+| `title` | `string` | Question title |
+| `difficulty` | `string` | `easy` · `medium` · `hard` |
+| `points` | `number` | Points awarded |
+| `timeMinutes` | `number` | Suggested time |
+| _…content_ | _varies_ | The prompt body and fields specific to the question type |
+
+```json Result (shape)
+{
+  "questionId": "qN4k1Zt7",
+  "type": "cad",
+  "title": "Model a parametric bracket",
+  "difficulty": "medium",
+  "points": 50,
+  "timeMinutes": 30,
+  "prompt": "Create a CAD model of the bracket described below ..."
+}
+```
+
+The fields after `timeMinutes` depend on the question type — answer-key fields such
+as ground-truth solutions, reference models, and reference images are stripped
+before the response is built.
+
+### Access rules
+
+`get_question` applies the **same access gate as the website**:
+
+- **Paywalled questions** require the relevant pack. Without it you get an error
+  like `This question requires the Pro pack.`
+- **Draft / unpublished** questions are only visible to roles allowed to see them.
+- Question types not yet exposed over MCP return
+  `Question type "<type>" is not available over MCP yet.`
+
+### Common errors
+
+| Message | Cause |
+| --- | --- |
+| `No unsolved question found for those filters. …` | Everything matching is already solved, or filters are too narrow |
+| `No question found with id "<id>".` | The `questionId` doesn't exist or isn't visible to you |
+| `This question requires the <pack> pack.` | Paywalled content you don't own |
+| `Question type "<type>" is not available over MCP yet.` | Unsupported type for the resolved question |
+| `Question content is unavailable.` | The question detail row is missing |
+
+<Tip>
+Pair `get_question` with your assistant to practice interactively: *"Get me a
+random unsolved DFM question, then walk me through how to approach it."* The model
+sees only the prompt, so it coaches without revealing the answer.
+</Tip>

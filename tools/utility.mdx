@@ -1,0 +1,116 @@
+---
+title: "Utility tools"
+description: "Connectivity and identity tools: ping, whoami, get_user_profile."
+icon: "screwdriver-wrench"
+---
+
+Small tools for confirming the connection and inspecting who you're connected as.
+
+## ping
+
+A health check. Echoes an optional message back.
+
+| | |
+| --- | --- |
+| **Acts as you** | No |
+| **Scope** | — |
+
+**Input**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `message` | `string` | No | Up to 200 characters. Echoed back. |
+
+**Output** — plain text: `pong`, or `pong: <message>` when a message is given.
+
+<CodeGroup>
+```text Call
+ping  { "message": "hello" }
+```
+
+```text Result
+pong: hello
+```
+</CodeGroup>
+
+<Tip>
+`ping` needs no scope and doesn't read your account, so it's the cleanest way to
+confirm a connection is alive after signing in.
+</Tip>
+
+---
+
+## whoami
+
+Returns the user and token behind the current connection — handy for confirming
+*which* account and *which* scopes a client is using.
+
+| | |
+| --- | --- |
+| **Acts as you** | Yes |
+| **Scope** | — |
+
+**Input** — none.
+
+**Output** — JSON:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `userId` | `string` | Your FixtureLabs user id |
+| `email` | `string \| null` | Account email |
+| `role` | `string` | Account role (e.g. `user`, `admin`) |
+| `scopes` | `string[]` | Scopes granted to this token |
+
+```json Result
+{
+  "userId": "V1StGXR8_Z5jdHi6B-myT",
+  "email": "you@example.com",
+  "role": "user",
+  "scopes": ["mcp", "blog:write"]
+}
+```
+
+<Note>
+Use `whoami` to debug scope problems. If `create_blog_post` fails, check that
+`scopes` includes `blog:write` — see [Scopes](/authentication/scopes).
+</Note>
+
+---
+
+## get_user_profile
+
+Returns your profile as captured from Google sign-in. Similar to `whoami`, but
+focused on profile details rather than token metadata.
+
+| | |
+| --- | --- |
+| **Acts as you** | Yes |
+| **Scope** | — |
+
+**Input** — none.
+
+**Output** — JSON:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | User id |
+| `name` | `string \| null` | Display name |
+| `email` | `string \| null` | Email |
+| `username` | `string \| null` | FixtureLabs username |
+| `picture` | `string \| null` | Avatar URL |
+| `role` | `string` | Account role |
+| `memberSince` | `string` | Account creation timestamp |
+
+```json Result
+{
+  "id": "V1StGXR8_Z5jdHi6B-myT",
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "username": "ada",
+  "picture": "https://lh3.googleusercontent.com/...",
+  "role": "user",
+  "memberSince": "2025-01-12T09:30:00.000Z"
+}
+```
+
+Returns an error result if the profile can't be found.
