@@ -1,0 +1,151 @@
+---
+title: "Blog post tools"
+description: "List, read, and draft FixtureLabs blog posts."
+icon: "newspaper"
+---
+
+Three tools for the FixtureLabs blog. Listing and reading are open to any connected
+token; creating a draft requires the `blog:write` scope.
+
+## list_blog_posts
+
+Lists **published** posts, most recent first, with optional tag and text filters.
+
+| | |
+| --- | --- |
+| **Acts as you** | No |
+| **Scope** | — |
+
+**Input**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `limit` | `integer` | No | 1–50. Defaults to `20`. |
+| `tag` | `string` | No | Filter by a tag (≤ 40 chars). |
+| `search` | `string` | No | Free-text search (≤ 200 chars). |
+
+**Output** — JSON:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `total` | `number` | Total matching posts |
+| `count` | `number` | Posts returned in this response |
+| `posts` | `array` | Post summaries (see below) |
+
+Each post summary contains `slug`, `title`, `excerpt`, `tags`, `author`,
+`readingMinutes`, and `publishedAt`. Full Markdown is **not** included — use
+`get_blog_post` for that.
+
+```json Result
+{
+  "total": 42,
+  "count": 2,
+  "posts": [
+    {
+      "slug": "getting-started-with-cad",
+      "title": "Getting Started with CAD",
+      "excerpt": "A practical on-ramp to parametric modeling.",
+      "tags": ["cad", "beginner"],
+      "author": "team@fixturelabs.io",
+      "readingMinutes": 6,
+      "publishedAt": "2025-05-01T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## get_blog_post
+
+Fetches a single **published** post by slug, including its full Markdown body.
+
+| | |
+| --- | --- |
+| **Acts as you** | No |
+| **Scope** | — |
+
+**Input**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `slug` | `string` | Yes | Lowercase letters, numbers, and hyphens; 3–120 chars. |
+
+**Output** — JSON: `slug`, `title`, `excerpt`, `tags`, `author`,
+`readingMinutes`, `publishedAt`, and `contentMd` (the post body as Markdown).
+
+```json Result
+{
+  "slug": "getting-started-with-cad",
+  "title": "Getting Started with CAD",
+  "excerpt": "A practical on-ramp to parametric modeling.",
+  "tags": ["cad", "beginner"],
+  "author": "team@fixturelabs.io",
+  "readingMinutes": 6,
+  "publishedAt": "2025-05-01T12:00:00.000Z",
+  "contentMd": "# Getting Started with CAD\n\n..."
+}
+```
+
+Returns an error result if no published post matches the slug. Unpublished/draft
+posts are never returned.
+
+---
+
+## create_blog_post
+
+Creates a new blog post **as a draft**, attributed to your account. Drafts are not
+public — an admin reviews and publishes them separately.
+
+| | |
+| --- | --- |
+| **Acts as you** | Yes |
+| **Scope** | **`blog:write`** (required) |
+| **Rate limit** | 20 per hour, per user |
+
+<Warning>
+The connected token must carry the `blog:write` scope. If it only has `mcp`, this
+tool returns a "missing a required scope" error. Confirm with
+[`whoami`](/tools/utility#whoami), and make sure your client requests `blog:write`
+during authorization — see [Scopes](/authentication/scopes).
+</Warning>
+
+**Input**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `slug` | `string` | Yes | Lowercase letters, numbers, hyphens; 3–120 chars. Must be unique. |
+| `title` | `string` | Yes | 3–200 chars. |
+| `excerpt` | `string` | Yes | 10–500 chars. |
+| `contentMd` | `string` | Yes | Markdown body, ≥ 10 chars. |
+| `tags` | `string[]` | No | Up to 20 tags, each 1–40 chars. Defaults to `[]`. |
+| `coverImage` | `string` (URL) | No | Cover image URL. |
+| `seoTitle` | `string` | No | ≤ 200 chars. |
+| `seoDescription` | `string` | No | ≤ 500 chars. |
+
+The post's author is set to your account automatically; status is always `draft`.
+
+**Output** — JSON:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | New post id |
+| `slug` | `string` | The post slug |
+| `status` | `string` | Always `draft` |
+| `message` | `string` | Next-step note |
+| `adminUrl` | `string` | Admin link to review/publish |
+
+```json Result
+{
+  "id": "9bX2c1pQ",
+  "slug": "designing-for-manufacturability",
+  "status": "draft",
+  "message": "Draft created. An admin can review and publish it.",
+  "adminUrl": "https://app.fixturelabs.io/admin/blogs/9bX2c1pQ"
+}
+```
+
+<Note>
+Hitting the hourly write limit returns a rate-limit error result — wait and retry.
+See [Rate limits](/reference/rate-limits).
+</Note>

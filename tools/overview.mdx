@@ -1,0 +1,78 @@
+---
+title: "Tools overview"
+description: "Every tool the FixtureLabs MCP server exposes, at a glance."
+icon: "wrench"
+---
+
+The server exposes **7 tools** across three areas: utility, blog posts, and
+practice questions. Every tool requires a connected token; the table below shows
+what each one additionally needs.
+
+| Tool | Area | Acts as you | Scope | Writes data |
+| --- | --- | --- | --- | --- |
+| [`ping`](/tools/utility#ping) | Utility | No | — | No |
+| [`whoami`](/tools/utility#whoami) | Utility | Yes | — | No |
+| [`get_user_profile`](/tools/utility#get-user-profile) | Utility | Yes | — | No |
+| [`list_blog_posts`](/tools/blog-posts#list-blog-posts) | Blog | No | — | No |
+| [`get_blog_post`](/tools/blog-posts#get-blog-post) | Blog | No | — | No |
+| [`create_blog_post`](/tools/blog-posts#create-blog-post) | Blog | Yes | `blog:write` | Yes (draft) |
+| [`get_question`](/tools/practice-questions#get-question) | Questions | Yes | — | No |
+
+<Info>
+**"Acts as you = No"** tools still require a valid token to call — they just don't
+read your identity or require a scope. See
+[Authentication → Overview](/authentication/overview#what-authenticated-gates).
+</Info>
+
+## How results are shaped
+
+MCP tools return a `content` array. The FixtureLabs tools use two shapes:
+
+- **Plain text** — `ping` returns a short string.
+- **JSON-as-text** — every other tool returns a single text item containing
+  pretty-printed JSON. Parse the text to get structured data.
+
+```json Example tool result
+{
+  "content": [
+    { "type": "text", "text": "{\n  \"userId\": \"...\",\n  \"role\": \"user\"\n}" }
+  ]
+}
+```
+
+## Errors
+
+Expected failures (not found, missing scope, no access, rate limited) come back as a
+normal result with `isError: true` and a human-readable message — they are **not**
+transport errors. Always check `isError` before trusting the payload. The full
+catalog is on the [Errors](/reference/errors) page.
+
+```json Example tool error
+{
+  "content": [{ "type": "text", "text": "This question requires the Pro pack." }],
+  "isError": true
+}
+```
+
+## Conventions
+
+- **Input validation** — every argument is schema-validated before the tool runs.
+  Out-of-range or malformed input is rejected with a clear message.
+- **Least exposure** — read tools return only user-facing fields. Question answer
+  keys and internal IDs are never included.
+- **Server identity** — the server advertises itself as `fixture-platform`
+  (version `0.1.0`) during the MCP handshake.
+
+## Browse by area
+
+<CardGroup cols={3}>
+  <Card title="Utility" icon="screwdriver-wrench" href="/tools/utility">
+    `ping`, `whoami`, `get_user_profile`
+  </Card>
+  <Card title="Blog posts" icon="newspaper" href="/tools/blog-posts">
+    `list_blog_posts`, `get_blog_post`, `create_blog_post`
+  </Card>
+  <Card title="Practice questions" icon="ruler-combined" href="/tools/practice-questions">
+    `get_question`
+  </Card>
+</CardGroup>
