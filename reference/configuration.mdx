@@ -1,54 +1,112 @@
 ---
 title: "Configuration"
-description: "Configure MCP servers in popular hosts."
+description: "Client config snippets and server-side environment for the MCP feature."
 icon: "gear"
 ---
 
-## Claude Desktop
+This page collects the configuration you need on both ends: the client snippets to
+connect, and the server-side environment for anyone **running** the FixtureLabs
+platform.
 
-Edit `claude_desktop_config.json`:
+## Client configuration
 
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+The endpoint is the same everywhere:
+
+```
+https://app.fixturelabs.io/api/mcps/mcp
+```
+
+**Remote-capable clients** (Cursor, VS Code, Claude custom connectors) take the URL
+directly:
 
 ```json
 {
   "mcpServers": {
-    "filesystem": {
+    "fixturelabs": { "url": "https://app.fixturelabs.io/api/mcps/mcp" }
+  }
+}
+```
+
+**stdio-only clients** (Claude Desktop by file) bridge with `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "fixturelabs": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/Documents"]
+      "args": ["-y", "mcp-remote", "https://app.fixturelabs.io/api/mcps/mcp"]
     }
   }
 }
 ```
 
-## Environment variables
+Per-client walkthroughs: [Claude](/connect/claude), [Cursor & IDEs](/connect/cursor),
+[Programmatic](/connect/programmatic).
 
-Pass secrets through `env`:
+---
 
-```json
-{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_TOKEN": "ghp_..." }
-    }
-  }
-}
+## Server-side configuration
+
+<Info>
+This section is for operators running the FixtureLabs platform itself — not for
+people connecting a client. If you're just using the server, you can stop at the
+section above.
+</Info>
+
+### Environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `MCP_TOKEN_PEPPER` | **Production** | Secret mixed into the SHA-256 hash of every token before storage. Set a strong, stable value — rotating it invalidates all existing tokens. A weak default is used only for local dev. |
+| `NEXT_PUBLIC_APP_URL` | **Yes** | Public base URL. Drives OAuth metadata (`issuer`, endpoints), the resource URL, redirect building, and `adminUrl` in tool results. Falls back to `http://localhost:3000`. |
+| `UPSTASH_REDIS_REST_URL` | Recommended | Enables rate limiting. Absent → limiter fails open. |
+| `UPSTASH_REDIS_REST_TOKEN` | Recommended | Token for the Redis instance above. |
+
+The MCP server also relies on the app's existing **Google sign-in (NextAuth)** and
+**Postgres database** — no extra configuration beyond what the app already needs.
+
+### Routing / middleware
+
+The app's middleware marks the discovery and OAuth surfaces as public so the
+unauthenticated handshake can happen:
+
+- `/.well-known/*` — discovery metadata
+- `/mcp/oauth/*` — the authorize/consent page
+
+The MCP endpoint (`/api/mcps/*`) is under `/api`, which is already public at the
+middleware layer; it enforces its own bearer-token auth.
+
+### Database migration
+
+The feature adds four tables — `mcp_tokens`, `oauth_clients`,
+`oauth_authorization_codes`, `oauth_refresh_tokens`. Apply the Drizzle migration
+that introduces them before serving traffic:
+
+```bash
+pnpm drizzle-kit migrate
 ```
 
-## Remote servers
+### Packages
 
-For HTTP transports, provide a URL and optional headers:
+The implementation depends on:
 
-```json
-{
-  "mcpServers": {
-    "acme": {
-      "url": "https://mcp.acme.com",
-      "headers": { "Authorization": "Bearer ${ACME_TOKEN}" }
-    }
-  }
-}
-```
+- `@modelcontextprotocol/sdk` — the MCP server primitives
+- `mcp-handler` — the Next.js Streamable HTTP adapter and `withMcpAuth` wrapper
+
+### Production checklist
+
+<Steps>
+  <Step title="Set a strong MCP_TOKEN_PEPPER">
+    Never ship the dev default. Treat it as a long-lived secret.
+  </Step>
+  <Step title="Set NEXT_PUBLIC_APP_URL to the real origin">
+    OAuth metadata and redirects must use your public HTTPS origin, or clients
+    can't complete the flow.
+  </Step>
+  <Step title="Configure Redis">
+    Provide both Upstash variables so write and registration limits are enforced.
+  </Step>
+  <Step title="Run migrations">
+    Ensure the four MCP/OAuth tables exist.
+  </Step>
+</Steps>

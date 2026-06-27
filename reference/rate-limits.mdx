@@ -1,0 +1,63 @@
+---
+title: "Rate limits"
+description: "Write and registration limits, and how they behave."
+icon: "gauge-high"
+---
+
+The server applies rate limits to the two surfaces that can be abused: writing data
+and registering OAuth clients. Read tools are not rate-limited at the MCP layer.
+
+| Action | Limit | Window | Keyed by |
+| --- | --- | --- | --- |
+| Blog post creation (`create_blog_post`) | 20 | 1 hour | User |
+| Dynamic Client Registration (`/api/mcp/oauth/register`) | 10 | 1 hour | Client IP |
+
+Limits use a **sliding window**, so the count reflects the trailing hour rather
+than resetting on a fixed clock boundary.
+
+## Why these two
+
+- **Writes per user** keep a single account (or a runaway agent) from flooding the
+  blog with drafts.
+- **Registrations per IP** matter because Dynamic Client Registration is, by OAuth
+  design, public and unauthenticated. The per-IP cap stops anonymous clients from
+  filling the client table.
+
+## What you get back
+
+**`create_blog_post`** over the limit returns a normal tool result with
+`isError: true`:
+
+```json
+{
+  "content": [
+    { "type": "text", "text": "Rate limit reached for blog creation. Please try again later." }
+  ],
+  "isError": true
+}
+```
+
+**Registration** over the limit returns HTTP `429` with an OAuth error body:
+
+```json
+{
+  "error": "temporarily_unavailable",
+  "error_description": "Too many registration requests. Please try again later."
+}
+```
+
+## Fail-open behavior
+
+Rate limiting is backed by Redis (Upstash). If Redis isn't configured or is
+temporarily unreachable, the limiter **fails open** — requests are allowed rather
+than blocked — and the incident is logged. Availability is favored over strict
+enforcement, so don't rely on the limiter as a hard security control; it's a guard
+rail against abuse.
+
+## Handling limits in a client
+
+- Back off and retry after a short delay; the window is rolling, so capacity
+  returns gradually.
+- For bulk drafting, stay under 20 creations/hour per user.
+- Register a client **once** and reuse its `client_id` — don't re-register on every
+  run.

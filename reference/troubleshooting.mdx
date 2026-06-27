@@ -1,32 +1,101 @@
 ---
 title: "Troubleshooting"
-description: "Common MCP issues and fixes."
+description: "Fixes for the most common FixtureLabs MCP connection issues."
 icon: "circle-question"
 ---
 
-## Server doesn't appear in the host
+Start by confirming the server is reachable — this needs no token:
 
-- Verify the config file path and JSON syntax.
-- Use an absolute path for `command` and script arguments.
-- Restart the host application after editing config.
+```bash
+curl https://app.fixturelabs.io/.well-known/oauth-protected-resource
+```
 
-## Tool calls fail silently
+If that returns JSON, the server is up and the problem is on the client or auth
+side. Work through the sections below.
 
-- Check that the server advertises `tools` in `capabilities`.
-- Confirm tool input matches the declared JSON schema.
-- Inspect server logs (stderr is forwarded to the host log).
+## The server doesn't appear in my client
 
-## Connection drops mid-session
+- Double-check the URL: `https://app.fixturelabs.io/api/mcps/mcp` (note `mcps`,
+  plural, and the trailing `/mcp`).
+- Validate your config file's JSON syntax and restart the client after editing.
+- For Claude Desktop by file, confirm Node.js is installed — `mcp-remote` runs via
+  `npx`.
 
-- For stdio: ensure your server never writes non-JSON to stdout.
-- For HTTP: confirm the server keeps SSE connections open and handles reconnect.
+## Stuck on sign-in / browser never opens
 
-## Resource updates aren't received
+When using `mcp-remote`, the OAuth handshake opens a browser window. If it hangs or
+loops:
 
-- The server must declare `resources.subscribe: true`.
-- Send `notifications/resources/updated` whenever underlying data changes.
+```bash
+# Clear cached tokens and client registration, then reconnect
+rm -rf ~/.mcp-auth
+```
 
-## Where to get help
+Then restart the client so it re-registers and signs you in cleanly.
 
-- [MCP specification](https://modelcontextprotocol.io)
-- [Reference servers](https://github.com/modelcontextprotocol/servers)
+## Every call returns 401 Unauthorized
+
+A `401` with a `WWW-Authenticate` header is the **normal trigger** for OAuth — a
+compliant client will start the flow automatically. If you're stuck at 401:
+
+- The access token is missing, expired, or revoked. Let the client refresh, or
+  clear its cache and re-authorize.
+- If you're calling raw HTTP, make sure you send
+  `Authorization: Bearer fxt_mcp_...` on every request.
+- Access tokens last **1 hour**; use the refresh token (or let the client) to get a
+  new one.
+
+## "missing a required scope" when creating a blog post
+
+`create_blog_post` needs the `blog:write` scope.
+
+1. Run [`whoami`](/tools/utility#whoami) and check the `scopes` array.
+2. If it only shows `mcp`, your client didn't request `blog:write` at
+   authorization. Reconnect with a client/config that requests it, then re-approve
+   on the consent screen.
+
+See [Scopes](/authentication/scopes).
+
+## `invalid_redirect_uri` during registration
+
+Redirect URIs must be **HTTPS**, or **HTTP on a loopback host** (`localhost`,
+`127.0.0.1`, `::1`). A plain `http://` URL on any other host is rejected. Most
+clients pick a valid loopback URI automatically.
+
+## `invalid_grant` at the token endpoint
+
+- **Authorization code expired** — codes live only **60 seconds** and are
+  single-use. Restart the authorization flow.
+- **Code reused** — each code works once. A retry after success fails here.
+- **PKCE mismatch** — the `code_verifier` doesn't match the `code_challenge`.
+- **Refresh token rotated/revoked** — refreshing returns a new refresh token and
+  revokes the old one; using a stale one fails. Use the latest, or re-authorize.
+
+## `get_question` says I have no access
+
+- *"This question requires the `<pack>` pack."* — it's paywalled content you don't
+  own. Try without filters to get a free question.
+- *"No unsolved question found for those filters."* — everything matching is solved
+  or the filters are too narrow. Drop `type`/`difficulty`, or pick another type.
+- *"… is not available over MCP yet."* — that question type isn't exposed over MCP.
+  Supported types: `fundamental`, `cad`, `dfm`, `calculations`.
+
+## Hitting rate limits
+
+- `create_blog_post` is capped at **20/hour per user**; back off and retry.
+- Registration is capped at **10/hour per IP** — register once and reuse the
+  `client_id` instead of re-registering each run.
+
+See [Rate limits](/reference/rate-limits).
+
+## Browser-based client can't connect (CORS)
+
+The server sends permissive CORS headers and answers preflight `OPTIONS`, so
+browser clients should work. If you see CORS errors, confirm you're hitting the
+exact endpoint over HTTPS and not an intermediate redirect.
+
+## Still stuck?
+
+- Re-read the [Authentication overview](/authentication/overview) — most issues are
+  a token or scope problem.
+- Check the [Errors](/reference/errors) catalog for the exact message you're seeing.
