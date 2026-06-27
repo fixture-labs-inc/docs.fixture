@@ -1,0 +1,239 @@
+---
+title: "Endpoint reference"
+description: "Discovery and OAuth endpoints, with exact request and response shapes."
+icon: "server"
+---
+
+All endpoints are rooted at `https://app.fixturelabs.io`. Discovery and OAuth
+endpoints are **open** (no token). The MCP endpoint itself requires a bearer token.
+
+| Purpose | Method & path |
+| --- | --- |
+| Protected-resource metadata | `GET /.well-known/oauth-protected-resource` |
+| Authorization-server metadata | `GET /.well-known/oauth-authorization-server` |
+| Dynamic Client Registration | `POST /api/mcp/oauth/register` |
+| Authorization (browser) | `GET /mcp/oauth/authorize` |
+| Token | `POST /api/mcp/oauth/token` |
+| MCP (tools) | `GET` / `POST /api/mcps/mcp` |
+
+---
+
+## Protected-resource metadata
+
+```http
+GET /.well-known/oauth-protected-resource
+```
+
+Tells a client this is a protected MCP resource and which authorization server
+issues tokens for it. Cached for one hour; CORS-enabled.
+
+```json Response
+{
+  "resource": "https://app.fixturelabs.io/api/mcps/mcp",
+  "authorization_servers": ["https://app.fixturelabs.io"]
+}
+```
+
+---
+
+## Authorization-server metadata
+
+```http
+GET /.well-known/oauth-authorization-server
+```
+
+Standard OAuth 2.0 Authorization Server Metadata. Cached for one hour;
+CORS-enabled.
+
+```json Response
+{
+  "issuer": "https://app.fixturelabs.io",
+  "authorization_endpoint": "https://app.fixturelabs.io/mcp/oauth/authorize",
+  "token_endpoint": "https://app.fixturelabs.io/api/mcp/oauth/token",
+  "registration_endpoint": "https://app.fixturelabs.io/api/mcp/oauth/register",
+  "scopes_supported": ["mcp", "blog:write"],
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["none"]
+}
+```
+
+`token_endpoint_auth_methods_supported: ["none"]` means clients are **public** —
+there is no client secret. Security comes from PKCE.
+
+---
+
+## Dynamic Client Registration
+
+```http
+POST /api/mcp/oauth/register
+Content-Type: application/json
+```
+
+Registers a new public client and returns a `client_id`. Rate-limited to **10
+registrations per hour per IP**.
+
+**Request body**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `redirect_uris` | `string[]` | Yes | 1–10 URIs. Each must be HTTPS, or HTTP on a loopback host. |
+| `client_name` | `string` | No | 1–120 chars. Defaults to `MCP Client`. |
+| `scope` | `string` | No | Space-separated default scopes. |
+| `grant_types` | `string[]` | No | Accepted for compatibility. |
+| `response_types` | `string[]` | No | Accepted for compatibility. |
+| `token_endpoint_auth_method` | `string` | No | Accepted for compatibility. |
+
+```bash Request
+curl -sS https://app.fixturelabs.io/api/mcp/oauth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "My Agent",
+    "redirect_uris": ["http://127.0.0.1:6274/oauth/callback"]
+  }'
+```
+
+```json Response — 201 Created
+{
+  "client_id": "V1StGXR8_Z5jdHi6B-myT",
+  "client_name": "My Agent",
+  "redirect_uris": ["http://127.0.0.1:6274/oauth/callback"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "client_id_issued_at": 1719500000
+}
+```
+
+**Errors**
+
+| HTTP | `error` | When |
+| --- | --- | --- |
+| 400 | `invalid_client_metadata` | Body isn't valid JSON / fails validation |
+| 400 | `invalid_redirect_uri` | A redirect URI isn't HTTPS or HTTP-loopback |
+| 429 | `temporarily_unavailable` | Per-IP registration rate limit hit |
+| 500 | `server_error` | Unexpected failure |
+
+---
+
+## Authorization
+
+```http
+GET /mcp/oauth/authorize
+```
+
+A **browser page**, not a JSON API. The client opens it; the user signs in (Google)
+and approves or denies on the consent screen.
+
+**Query parameters**
+
+| Param | Required | Notes |
+| --- | --- | --- |
+| `response_type` | Yes | Must be `code`. |
+| `client_id` | Yes | From registration. |
+| `redirect_uri` | Yes | Must exactly match one registered for the client. |
+| `code_challenge` | Yes | PKCE challenge, 43–128 chars. |
+| `code_challenge_method` | Yes | Must be `S256`. |
+| `scope` | No | Space-separated requested scopes. |
+| `state` | No | Opaque value echoed back on redirect. |
+| `resource` | No | Target resource indicator (RFC 8707). |
+
+**On approval** — redirects to your `redirect_uri` with the code:
+
+```
+{redirect_uri}?code=fxt_mcp_ac_xxxxxxxx&state=...
+```
+
+**On denial or error** — redirects with an OAuth error (`access_denied`,
+`invalid_request`, `server_error`). If the **client or redirect URI is invalid**,
+the server renders an error page instead of redirecting — this prevents open
+redirects to attacker-supplied URIs.
+
+---
+
+## Token
+
+```http
+POST /api/mcp/oauth/token
+Content-Type: application/x-www-form-urlencoded
+```
+
+Exchanges an authorization code for tokens, or rotates a refresh token. Responses
+are sent with `Cache-Control: no-store`.
+
+### Authorization code grant
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `grant_type` | Yes | `authorization_code` |
+| `code` | Yes | From the authorize redirect |
+| `redirect_uri` | Yes | Must match the one used at authorize |
+| `client_id` | Yes | From registration |
+| `code_verifier` | Yes | PKCE verifier for the earlier challenge |
+| `resource` | No | Must match if one was set at authorize |
+
+```bash Request
+curl -sS https://app.fixturelabs.io/api/mcp/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "code=fxt_mcp_ac_xxxxxxxx" \
+  -d "redirect_uri=http://127.0.0.1:6274/oauth/callback" \
+  -d "client_id=V1StGXR8_Z5jdHi6B-myT" \
+  -d "code_verifier=YOUR_PKCE_VERIFIER"
+```
+
+### Refresh token grant
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `grant_type` | Yes | `refresh_token` |
+| `refresh_token` | Yes | The latest refresh token |
+| `client_id` | Yes | Must match the token's client |
+
+```bash Request
+curl -sS https://app.fixturelabs.io/api/mcp/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=fxt_mcp_rt_xxxxxxxx" \
+  -d "client_id=V1StGXR8_Z5jdHi6B-myT"
+```
+
+### Success response
+
+```json
+{
+  "access_token": "fxt_mcp_xxxxxxxx",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "fxt_mcp_rt_yyyyyyyy",
+  "scope": "mcp blog:write"
+}
+```
+
+Refresh returns a **new** refresh token and revokes the old one. Always persist the
+most recent value.
+
+**Errors**
+
+| HTTP | `error` | When |
+| --- | --- | --- |
+| 400 | `invalid_request` | Missing/unparseable fields |
+| 401 | `invalid_client` | Unknown `client_id` |
+| 400 | `invalid_grant` | Code/refresh invalid, expired, reused, or PKCE mismatch |
+| 500 | `server_error` | Unexpected failure |
+
+---
+
+## MCP endpoint
+
+```http
+POST /api/mcps/mcp
+Authorization: Bearer fxt_mcp_xxxxxxxx
+Content-Type: application/json
+Accept: application/json, text/event-stream
+```
+
+JSON-RPC 2.0 over Streamable HTTP. A missing or invalid token returns **401** with
+a `WWW-Authenticate` header referencing the protected-resource metadata. See
+[Programmatic access](/connect/programmatic) for full examples.
