@@ -1,0 +1,147 @@
+---
+title: "Claude"
+description: "Connect the FixtureLabs MCP server to Claude."
+icon: "comment"
+---
+
+Claude connects to the FixtureLabs MCP server three ways: the **Claude Code CLI**, a
+**custom connector** (Claude web / Desktop), or the **`mcp-remote` bridge** (any
+Claude that reads a config file). All point at the same endpoint:
+
+```
+https://app.fixturelabs.io/api/mcps/mcp
+```
+
+<Tip>
+**Fastest way to connect + sign in.** In Claude Code, run one command and then
+authenticate:
+
+```bash
+claude mcp add --transport http fixturelabs https://app.fixturelabs.io/api/mcps/mcp
+```
+
+Then start (or restart) Claude Code and run `/mcp` — it triggers the FixtureLabs
+OAuth sign-in in your browser. Approve, and the tools are live.
+</Tip>
+
+## Option A — Claude Code (CLI)
+
+The `claude mcp add` command registers the server; the `/mcp` command runs the
+OAuth flow.
+
+<Steps>
+  <Step title="Add the server">
+    ```bash
+    claude mcp add --transport http fixturelabs https://app.fixturelabs.io/api/mcps/mcp
+    ```
+    Add `--scope user` to make it available across all your projects, or
+    `--scope project` to share it with your team via `.mcp.json`.
+  </Step>
+  <Step title="Authenticate">
+    In Claude Code, run:
+    ```
+    /mcp
+    ```
+    Select **fixturelabs → Authenticate**. Your browser opens the FixtureLabs
+    sign-in and consent screen. Approve access.
+  </Step>
+  <Step title="Confirm">
+    `/mcp` should now show `fixturelabs` as **connected**. Ask Claude to call
+    `ping` or `whoami` to verify (see [Verify](#verify-the-connection) below).
+  </Step>
+</Steps>
+
+To remove it later: `claude mcp remove fixturelabs`.
+
+## Option B — Custom connector (Claude web / Desktop)
+
+If your Claude plan exposes **Settings → Connectors → Add custom connector**:
+
+<Steps>
+  <Step title="Open the connector dialog">
+    Go to **Settings → Connectors** and choose **Add custom connector**.
+  </Step>
+  <Step title="Enter the URL">
+    Paste `https://app.fixturelabs.io/api/mcps/mcp` as the server URL and save.
+  </Step>
+  <Step title="Authorize">
+    Claude discovers the OAuth configuration automatically and sends you to the
+    FixtureLabs sign-in and consent screen. Approve access.
+  </Step>
+  <Step title="Use the tools">
+    The FixtureLabs tools now appear in Claude. Ask it to `ping` or call `whoami`
+    to confirm.
+  </Step>
+</Steps>
+
+## Option C — `mcp-remote` (Claude Desktop by file)
+
+When you configure Claude Desktop through its config file, use the `mcp-remote`
+bridge. It performs the OAuth dance and proxies the stdio connection to the remote
+server.
+
+Edit `claude_desktop_config.json`:
+
+- **macOS** — `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows** — `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "fixturelabs": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://app.fixturelabs.io/api/mcps/mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop. A browser window opens for sign-in the first time the
+server starts.
+
+<Note>
+On the consent screen, a generic bridge client (such as `mcp-remote`) is shown as
+**Fixture** rather than its raw client name, so you always know you're authorizing
+FixtureLabs access for your own use.
+</Note>
+
+### Prime the sign-in from a terminal
+
+You can also run the bridge directly to trigger the OAuth flow before wiring it into
+a client — handy for testing that your account can connect:
+
+```bash
+npx -y mcp-remote https://app.fixturelabs.io/api/mcps/mcp
+```
+
+It opens the browser, completes consent, and caches the token under `~/.mcp-auth`.
+
+## Verify the connection
+
+Ask Claude:
+
+> "Call the fixturelabs **ping** tool."  →  expect `pong`
+
+> "Call **whoami** on fixturelabs."  →  expect your user id, email, role, and scopes
+
+Want to check the server itself is reachable before connecting a client? The
+discovery endpoint is public:
+
+```bash
+curl https://app.fixturelabs.io/.well-known/oauth-protected-resource
+# → {"resource":".../api/mcps/mcp","authorization_servers":["https://app.fixturelabs.io"]}
+```
+
+## Re-authorizing
+
+Access tokens are short-lived (1 hour) and refreshed automatically. If you get stuck
+in a failed-auth loop:
+
+- **Claude Code** — run `/mcp`, then re-authenticate `fixturelabs`.
+- **`mcp-remote`** — clear its token cache and reconnect:
+
+  ```bash
+  rm -rf ~/.mcp-auth
+  ```
+
+See [Troubleshooting](/reference/troubleshooting) for more.
