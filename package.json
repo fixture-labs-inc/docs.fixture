@@ -1,0 +1,15 @@
+{
+  "name": "docs.fixture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP documentation site built with Mintlify",
+  "scripts": {
+    "dev": "mint dev",
+    "build": "mint build",
+    "check": "mint broken-links",
+    "upgrade": "mint update"
+  },
+  "devDependencies": {
+    "mint": "^4.2.647"
+  }
+}
