@@ -1,0 +1,97 @@
+---
+title: "Errors"
+description: "Tool error results and OAuth error responses."
+icon: "triangle-exclamation"
+---
+
+There are two error styles, depending on which layer fails: **tool errors** (inside
+a successful MCP call) and **OAuth/HTTP errors** (during auth).
+
+## Tool errors
+
+When a tool can't complete an *expected* failure — not found, no access, missing
+scope, rate limited — it returns a normal MCP result with `isError: true` and a
+human-readable message. It does **not** raise a transport error.
+
+```json
+{
+  "content": [{ "type": "text", "text": "This question requires the Pro pack." }],
+  "isError": true
+}
+```
+
+Always inspect `isError` before using a tool's payload.
+
+**Common tool error messages**
+
+| Message | Tool | Cause |
+| --- | --- | --- |
+| `Authentication required: provide a Bearer MCP token.` | any user tool | Token didn't resolve to a user |
+| `Your token is missing a required scope for this tool.` | `create_blog_post` | Token lacks `blog:write` |
+| `Rate limit reached for blog creation. Please try again later.` | `create_blog_post` | Hourly write limit hit |
+| `No published blog post found with slug "…".` | `get_blog_post` | Unknown or unpublished slug |
+| `No unsolved question found for those filters. …` | `get_question` | Nothing matches / all solved |
+| `No question found with id "…".` | `get_question` | Unknown or invisible id |
+| `This question requires the <pack> pack.` | `get_question` | Paywalled content |
+| `Question type "<type>" is not available over MCP yet.` | `get_question` | Unsupported type |
+| `Tool execution failed.` | any | Unexpected handler error (details are logged server-side) |
+
+<Note>
+Internal failures are caught and returned as a generic error result; specifics are
+logged on the server, not leaked to the client.
+</Note>
+
+## OAuth & HTTP errors
+
+The OAuth endpoints return standard OAuth 2.0 error bodies (RFC 6749 §5.2) with an
+appropriate HTTP status:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Authorization code is invalid, expired, or already used"
+}
+```
+
+| HTTP | `error` | Meaning |
+| --- | --- | --- |
+| 400 | `invalid_request` | Malformed or missing parameters |
+| 400 | `invalid_client_metadata` | Registration body failed validation |
+| 400 | `invalid_redirect_uri` | Redirect URI not HTTPS / HTTP-loopback |
+| 400 | `invalid_grant` | Code/refresh invalid, expired, reused, or PKCE mismatch |
+| 401 | `invalid_client` | Unknown `client_id` at the token endpoint |
+| 403 | `access_denied` | User declined on the consent screen (returned via redirect) |
+| 429 | `temporarily_unavailable` | Registration rate limit hit |
+| 500 | `server_error` | Unexpected failure |
+
+### The 401 that starts OAuth
+
+A request to the MCP endpoint **without a valid token** returns:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer error="invalid_token", error_description="No authorization provided", resource_metadata="https://app.fixturelabs.io/.well-known/oauth-protected-resource"
+```
+
+This isn't a failure to fix directly — it's the signal a compliant MCP client uses
+to discover the authorization server and begin the
+[OAuth flow](/authentication/overview).
+
+## Quick triage
+
+<CardGroup cols={2}>
+  <Card title="401 on every call" icon="lock">
+    No/expired token. Let the client refresh, or re-run the OAuth flow.
+  </Card>
+  <Card title="Missing scope error" icon="shield-halved">
+    Request `blog:write` at authorization. Verify with `whoami`.
+  </Card>
+  <Card title="invalid_grant at token" icon="clock">
+    Code expired (60s) or was reused; refresh token rotated. Restart the flow.
+  </Card>
+  <Card title="invalid_redirect_uri" icon="link-slash">
+    Use HTTPS, or HTTP on localhost/127.0.0.1/::1.
+  </Card>
+</CardGroup>
+
+More fixes on the [Troubleshooting](/reference/troubleshooting) page.
